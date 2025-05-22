@@ -1,53 +1,75 @@
+import pytest
+from django.contrib.auth import get_user_model
+from django.test import TestCase
 from student_management_app.EmailBackEnd import EmailBackEnd
-from student_management_app.models import CustomUser
 
-class TestEmailBackend:
-    def setup_method(self):
-        # Tạo tài khoản người dùng demo test
+User = get_user_model()
+
+class EmailBackEndTestCase(TestCase):
+    """
+    Test suite for the EmailBackEnd authentication backend.
+    """
+
+    def setUp(self):
+        """
+        Set up a test user and initialize the EmailBackEnd instance.
+        """
         self.backend = EmailBackEnd()
-        self.username = "test@example.com"
-        self.email = "test@example.com"
-        self.password = "securepassword"
-        self.wrong_password = "wrongpassword"
-
-        self.user = CustomUser.objects.create_user(
-            username=self.username,
-            password=self.password,
-            email=self.email,
-            first_name="first_name",
-            last_name="last_name",
-            user_type=2
+        self.user_email = "testuser@example.com"
+        self.user_password = "testpassword123"
+        # Create a user with email and password for authentication tests
+        self.user = User.objects.create_user(
+            email=self.user_email,
+            password=self.user_password,
+            username="testuser"
         )
 
-    # Test case 1: user tồn tại và mật khẩu đúng
-    def test_authenticate_success(self):
-        user = self.backend.authenticate(
-            username=self.email,
-            password=self.password
-        )
+    def test_authenticate_with_correct_email_and_password(self):
+        """
+        Test that authenticate returns a user object when provided correct email and password.
+        """
+        user = self.backend.authenticate(username=self.user_email, password=self.user_password)
+        self.assertIsNotNone(user, "Authentication should succeed with valid credentials.")
+        self.assertEqual(user.email, self.user_email, "Returned user email should match the one used for login.")
 
-        # Mong đợi: trả về user object (khác None)
-        assert user is not None
+    def test_authenticate_with_wrong_email(self):
+        """
+        Test that authenticate returns None when the email is incorrect.
+        """
+        user = self.backend.authenticate(username="wrong@example.com", password=self.user_password)
+        self.assertIsNone(user, "Authentication should fail with an incorrect email.")
 
-        # Mong đợi: user trả về có đúng email đã tạo ở trên
-        assert user.email == self.email
+    def test_authenticate_with_wrong_password(self):
+        """
+        Test that authenticate returns None when the password is incorrect.
+        """
+        user = self.backend.authenticate(username=self.user_email, password="wrongpassword")
+        self.assertIsNone(user, "Authentication should fail with an incorrect password.")
 
-    # Test case 2: user tồn tại nhưng mật khẩu sai
-    def test_authenticate_wrong_password(self):
-        user = self.backend.authenticate(
-            username=self.email,
-            password=self.wrong_password
-        )
+    def test_authenticate_with_no_email(self):
+        """
+        Test that authenticate returns None when no email is provided.
+        """
+        user = self.backend.authenticate(username=None, password=self.user_password)
+        self.assertIsNone(user, "Authentication should fail when the email is None.")
 
-        # Mong đợi: trả về None vì mật khẩu không đúng
-        assert user is None
-
-    # Test case 3: user không tồn tại trong hệ thống
-    def test_authenticate_user_not_exist(self):
-        user = self.backend.authenticate(
-            username="nonexistent@example.com",
-            password="any"
-        )
-
-        # Mong đợi: trả về None vì không tìm thấy user với email này
-        assert user is None
+    def test_authenticate_with_no_password(self):
+        """
+        Test that authenticate returns None when no password is provided.
+        """
+        user = self.backend.authenticate(username=self.user_email, password=None)
+        self.assertIsNone(user, "Authentication should fail when the password is None.")
+        
+    def test_authenticate_with_nonexistent_user(self):
+        """
+        Test that authenticate returns None when the user does not exist.
+        """
+        user = self.backend.authenticate(username="abcdef", password="wrongpassword")
+        self.assertIsNone(user, "Authentication should fail for a nonexistent user.")
+        
+    def test_authenticate_with_empty_credentials(self):
+        """
+        Test that authenticate returns None when empty strings are provided for both username and password.
+        """
+        user = self.backend.authenticate(username="", password="")
+        self.assertIsNone(user, "Authentication should fail when credentials are empty strings.")
